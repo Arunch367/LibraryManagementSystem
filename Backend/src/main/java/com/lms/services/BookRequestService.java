@@ -72,4 +72,14 @@ public class BookRequestService {
     public List<BookRequest> getRequestsByUser(long userId) {
         return bookRequestRepository.findByUserId(userId);
     }
+    public BookRequest updateRequestStatus(long requestId, String status) {
+        BookRequest existingRequest = requestById(requestId);
+
+        // Convert String to Enum
+        BorrowStatus newStatus = BorrowStatus.valueOf(status.toUpperCase());
+        existingRequest.setStatus(newStatus);
+
+        return bookRequestRepository.save(existingRequest);
+    }
+
 }

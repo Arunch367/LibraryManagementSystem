@@ -50,4 +50,9 @@ public class BookRequestController {
     public List<BookRequest> getRequestsByUser(@PathVariable long userId) {
         return bookRequestService.getRequestsByUser(userId);
     }
+    @PutMapping("/requests/{id}/status")
+    public BookRequest updateRequestStatus(@PathVariable long id, @RequestParam("status") String status) {
+        return bookRequestService.updateRequestStatus(id, status);
+    }
+
 }

@@ -166,27 +166,35 @@ function Dashboard() {
   const [userName, setUserName] = useState("");
   const [averageRatings, setAverageRatings] = useState({});
 
+  // ✅ Fetch books
   useEffect(() => {
     axios
       .get("http://localhost:8080/books")
       .then((response) => {
         setBooks(response.data);
-
-        // ✅ Fetch only requests made by the current user
-        axios
-          .get(`http://localhost:8080/requests/user/${userId}`)
-          .then((response) => {
-            const statusDict = response.data.reduce((acc, request) => {
-              acc[request.book.id] = request.status;
-              return acc;
-            }, {});
-            setBookStatuses(statusDict);
-          })
-          .catch((error) => console.log(error));
       })
       .catch((error) => console.log(error));
-  }, [userId]);
+  }, []);
 
+  // ✅ Fetch user-specific requests & update statuses
+  useEffect(() => {
+    axios
+      .get(`http://localhost:8080/requests/user/${userId}`)
+      .then((response) => {
+        const statusDict = response.data.reduce((acc, request) => {
+          if (request.status === "REJECTED" || request.status === "RETURNED") {
+            delete acc[request.book.id]; // ✅ Allow user to request again
+          } else {
+            acc[request.book.id] = request.status;
+          }
+          return acc;
+        }, {});
+        setBookStatuses(statusDict);
+      })
+      .catch((error) => console.log(error));
+  }, [userId, bookStatuses]); // ✅ Added bookStatuses to refetch updates dynamically
+
+  // ✅ Fetch user details
   useEffect(() => {
     axios
       .get(`http://localhost:8080/users/${userId}`)
@@ -194,6 +202,7 @@ function Dashboard() {
       .catch((error) => console.log(error));
   }, [userId]);
 
+  // ✅ Fetch book ratings
   useEffect(() => {
     axios
       .get("http://localhost:8080/ratings")
@@ -223,7 +232,7 @@ function Dashboard() {
       .catch((error) => console.log(error));
   }, []);
 
-  // ✅ Updated function to disable button immediately after request
+  // ✅ Handle book request
   const handleBorrow = (id) => {
     axios
       .post("http://localhost:8080/borrow", {
