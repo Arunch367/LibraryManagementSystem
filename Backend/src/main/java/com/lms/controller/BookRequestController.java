@@ -8,51 +8,49 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@RequestMapping("/requests")
 public class BookRequestController {
 
     @Autowired
     BookRequestService bookRequestService;
 
-    @GetMapping("/requests")
+    @GetMapping
     public List<BookRequest> getAllRequests(){
         return bookRequestService.getAllRequests();
     }
 
-    @GetMapping("/requests/{id}")
+    @GetMapping("/{id}")
     public BookRequest requestById(@PathVariable long id){
         return bookRequestService.requestById(id);
     }
 
-    @PostMapping("/requests")
-    public BookRequest addRequests(@RequestBody BookRequest br){
+    @PostMapping
+    public BookRequest addRequest(@RequestBody BookRequest br){
         return bookRequestService.addRequest(br);
     }
 
-    @PutMapping("/requests/{id}")
-    public BookRequest updateRequest(@RequestBody BookRequest br, @PathVariable long id, @RequestParam("admin") long adminId){
-        BookRequest bookRequest = requestById(id);
-        return bookRequestService.updateRequest(bookRequest, adminId);
+    @PutMapping("/{id}/approve")
+    public BookRequest updateRequest(@PathVariable long id, @RequestParam("admin") long adminId){
+        return bookRequestService.updateRequest(id, adminId);
     }
 
-    @PutMapping("/requests_return/{id}")
-    public BookRequest updateRequestReturn(@RequestBody BookRequest br, @PathVariable long id){
-        BookRequest bookRequest = requestById(id);
-        return bookRequestService.updateRequestReturn(bookRequest);
+    @PutMapping("/{id}/return")
+    public BookRequest updateRequestReturn(@PathVariable long id){
+        return bookRequestService.updateRequestReturn(id);
     }
 
-    @DeleteMapping("/requests/{id}")
+    @DeleteMapping("/{id}")
     public void deleteRequest(@PathVariable long id){
         bookRequestService.deleteRequest(id);
     }
 
-    // ✅ Added new endpoint to fetch requests made by a user
-    @GetMapping("/requests/user/{userId}")
+    @GetMapping("/user/{userId}")
     public List<BookRequest> getRequestsByUser(@PathVariable long userId) {
         return bookRequestService.getRequestsByUser(userId);
     }
-    @PutMapping("/requests/{id}/status")
+
+    @PutMapping("/{id}/status")
     public BookRequest updateRequestStatus(@PathVariable long id, @RequestParam("status") String status) {
         return bookRequestService.updateRequestStatus(id, status);
     }
-
 }

@@ -9,77 +9,67 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class BookRequestService {
 
     @Autowired
-    BookRequestRepository bookRequestRepository;
+    private BookRequestRepository bookRequestRepository;
 
-    public List<BookRequest> getAllRequests(){
-        List<BookRequest> br = new ArrayList<>();
-        bookRequestRepository.findAll().forEach(br::add);
-        return br;
+    public List<BookRequest> getAllRequests() {
+        List<BookRequest> requests = new ArrayList<>();
+        bookRequestRepository.findAll().forEach(requests::add);
+        return requests;
     }
 
-    public BookRequest addRequest(BookRequest br){
+    public BookRequest requestById(long id) {
+        return bookRequestRepository.findById(id).orElseThrow();
+    }
+
+    public BookRequest addRequest(BookRequest br) {
+        // ✅ Allow new request if last request was "RETURNED"
+        Optional<BookRequest> existingRequest = bookRequestRepository.findByUserIdAndBookId(
+                br.getUser().getId(), br.getBook().getId()
+        );
+
+        if (existingRequest.isPresent() && existingRequest.get().getStatus() != BorrowStatus.RETURNED) {
+            throw new RuntimeException("You have already requested this book.");
+        }
+
         br.setStatus(BorrowStatus.REQUESTED);
         return bookRequestRepository.save(br);
     }
 
-    public BookRequest requestById(long id){
-        return bookRequestRepository.findById(id).orElseThrow();
-    }
-
-    public BookRequest updateRequest(BookRequest br, long adminId){
-        // get existing book request
-        BookRequest existingRequest = requestById(br.getId());
-
-        // set book returned status
-        existingRequest.setStatus(BorrowStatus.RETURNED);
-        existingRequest.setBook(br.getBook());
-        existingRequest.setUser(br.getUser());
+    public BookRequest updateRequest(long requestId, long adminId) {
+        BookRequest existingRequest = requestById(requestId);
+        existingRequest.setStatus(BorrowStatus.ACCEPTED); // ✅ Correct status update
 
         Admin admin = new Admin();
         admin.setId(adminId);
         existingRequest.setAdmin(admin);
-        // save edited data
-        bookRequestRepository.save(existingRequest);
-
-        return existingRequest;
-    }
-
-    public BookRequest updateRequestReturn(BookRequest br){
-        // get existing book request
-        BookRequest existingRequest = requestById(br.getId());
-
-        // set book returned status
-        existingRequest.setStatus(BorrowStatus.RETURNED);
-        existingRequest.setBook(br.getBook());
-        existingRequest.setUser(br.getUser());
-        existingRequest.setAdmin(br.getAdmin());
-        // save edited data
-        bookRequestRepository.save(existingRequest);
-
-        return existingRequest;
-    }
-
-    public void deleteRequest(long id){
-        bookRequestRepository.deleteById(id);
-    }
-
-    // ✅ Added method to get all requests made by a user
-    public List<BookRequest> getRequestsByUser(long userId) {
-        return bookRequestRepository.findByUserId(userId);
-    }
-    public BookRequest updateRequestStatus(long requestId, String status) {
-        BookRequest existingRequest = requestById(requestId);
-
-        // Convert String to Enum
-        BorrowStatus newStatus = BorrowStatus.valueOf(status.toUpperCase());
-        existingRequest.setStatus(newStatus);
 
         return bookRequestRepository.save(existingRequest);
     }
 
+    public void deleteRequest(long id) {
+        bookRequestRepository.deleteById(id);
+    }
+
+    public List<BookRequest> getRequestsByUser(long userId) {
+        return bookRequestRepository.findByUserId(userId);
+    }
+
+    public BookRequest updateRequestStatus(long requestId, String status) {
+        BookRequest existingRequest = requestById(requestId);
+        BorrowStatus newStatus = BorrowStatus.valueOf(status.toUpperCase());
+        existingRequest.setStatus(newStatus);
+        return bookRequestRepository.save(existingRequest);
+    }
+
+    public BookRequest updateRequestReturn(long requestId) {
+        BookRequest bookRequest = requestById(requestId);
+        bookRequest.setStatus(BorrowStatus.RETURNED);
+        return bookRequestRepository.save(bookRequest);
+    }
 }

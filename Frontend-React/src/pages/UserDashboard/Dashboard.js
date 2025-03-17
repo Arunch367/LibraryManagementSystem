@@ -170,36 +170,40 @@ function Dashboard() {
   useEffect(() => {
     axios
       .get("http://localhost:8080/books")
-      .then((response) => {
-        setBooks(response.data);
-      })
-      .catch((error) => console.log(error));
+      .then((response) => setBooks(response.data))
+      .catch((error) => console.log("Error fetching books:", error));
   }, []);
 
-  // ✅ Fetch user-specific requests & update statuses
-  useEffect(() => {
+  const fetchUserRequests = () => {
+    if (!userId) return;
+
     axios
       .get(`http://localhost:8080/requests/user/${userId}`)
       .then((response) => {
         const statusDict = response.data.reduce((acc, request) => {
-          if (request.status === "REJECTED" || request.status === "RETURNED") {
-            delete acc[request.book.id]; // ✅ Allow user to request again
-          } else {
-            acc[request.book.id] = request.status;
+          const { status, book } = request;
+
+          // Only track active requests (exclude RETURNED and REJECTED)
+          if (status !== "RETURNED" && status !== "REJECTED") {
+            acc[book.id] = status;
           }
+
           return acc;
         }, {});
+
         setBookStatuses(statusDict);
       })
-      .catch((error) => console.log(error));
-  }, [userId, bookStatuses]); // ✅ Added bookStatuses to refetch updates dynamically
+      .catch((error) => console.error("Error fetching user requests:", error));
+  };
 
   // ✅ Fetch user details
   useEffect(() => {
-    axios
-      .get(`http://localhost:8080/users/${userId}`)
-      .then((response) => setUserName(response.data.name))
-      .catch((error) => console.log(error));
+    if (userId) {
+      axios
+        .get(`http://localhost:8080/users/${userId}`)
+        .then((response) => setUserName(response.data.name))
+        .catch((error) => console.log("Error fetching user details:", error));
+    }
   }, [userId]);
 
   // ✅ Fetch book ratings
@@ -208,55 +212,51 @@ function Dashboard() {
       .get("http://localhost:8080/ratings")
       .then((response) => {
         const ratingMap = {};
-        response.data.forEach((item) => {
-          const { id } = item.book;
-          if (ratingMap[id]) {
-            ratingMap[id].totalRating += item.rating;
-            ratingMap[id].numRatings += 1;
+        response.data.forEach(({ book, rating }) => {
+          if (ratingMap[book.id]) {
+            ratingMap[book.id].totalRating += rating;
+            ratingMap[book.id].numRatings += 1;
           } else {
-            ratingMap[id] = { totalRating: item.rating, numRatings: 1 };
+            ratingMap[book.id] = { totalRating: rating, numRatings: 1 };
           }
         });
 
-        const newAverageRatings = Object.entries(ratingMap).reduce(
-          (acc, [bookId, ratingInfo]) => {
-            acc[bookId] = (
-              ratingInfo.totalRating / ratingInfo.numRatings
-            ).toFixed(1);
+        const newAverageRatings = Object.keys(ratingMap).reduce(
+          (acc, bookId) => {
+            const { totalRating, numRatings } = ratingMap[bookId];
+            acc[bookId] = (totalRating / numRatings).toFixed(1);
             return acc;
           },
           {}
         );
         setAverageRatings(newAverageRatings);
       })
-      .catch((error) => console.log(error));
+      .catch((error) => console.log("Error fetching ratings:", error));
   }, []);
 
   // ✅ Handle book request
-  const handleBorrow = (id) => {
+  const handleBorrow = (bookId) => {
     axios
       .post("http://localhost:8080/borrow", {
         user: { id: userId },
-        book: { id },
+        book: { id: bookId },
       })
       .then(() => {
         axios
           .post("http://localhost:8080/requests", {
             user: { id: userId },
-            book: { id },
+            book: { id: bookId },
           })
           .then(() => {
-            toast.success("Book requested");
+            toast.success("Book requested successfully!");
 
-            // ✅ Immediately update UI to disable button
-            setBookStatuses((prevStatuses) => ({
-              ...prevStatuses,
-              [id]: "REQUESTED",
-            }));
+            // ✅ Immediately update UI & refresh request list
+            setBookStatuses((prev) => ({ ...prev, [bookId]: "REQUESTED" }));
+            fetchUserRequests();
           })
-          .catch(() => toast.error("Unable to request"));
+          .catch(() => toast.error("Request failed!"));
       })
-      .catch(() => toast.error("Failed, max 2 requests"));
+      .catch(() => toast.error("Failed, max 2 requests allowed!"));
   };
 
   return (
@@ -266,7 +266,7 @@ function Dashboard() {
           Hello, {userName}
         </h3>
         <div className="user">
-          <img className="navLogo" src={logo} alt="logo" />
+          <img className="navLogo" src={logo} alt="User logo" />
         </div>
       </div>
       <div id="dashboard-container" style={{ marginTop: "2rem" }}>
@@ -293,7 +293,9 @@ function Dashboard() {
                 <td>{averageRatings[book.id] || "0.0"} / 5</td>
                 <td>
                   {bookStatuses[book.id] === "REQUESTED" ? (
-                    <span>Requested</span>
+                    <span style={{ color: "green", fontWeight: "bold" }}>
+                      Requested
+                    </span>
                   ) : (
                     <button onClick={() => handleBorrow(book.id)}>
                       Request
